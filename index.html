@@ -1,0 +1,1026 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kitchen Stock</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;700&display=swap">
+<style>
+/* Layout: sticky header (title, search, tabs) over one long list grouped by storage place; sheet slides up for edits */
+:root {
+  --bg: #eef1ef; --surface: #ffffff; --ink: #16201c; --mute: #5d6b65; --line: #d9e0dc;
+  --accent: #0f6b5c; --accent-ink: #ffffff; --out: #b8431a; --out-bg: #f7e6df;
+  --fridge: #2b7bb9; --freezer: #5b5bd6; --cup: #a8731a; --shadow: 0 6px 24px rgba(10, 30, 24, .18);
+  --font: "Schibsted Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1513; --surface: #182019; --ink: #e8efeb; --mute: #94a39b; --line: #27332e;
+    --accent: #4cc2a8; --accent-ink: #06241d; --out: #f08a5d; --out-bg: #2c1d16;
+    --fridge: #6bb4ea; --freezer: #9a9af0; --cup: #e0b25c; --shadow: 0 6px 24px rgba(0, 0, 0, .5);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1513; --surface: #182019; --ink: #e8efeb; --mute: #94a39b; --line: #27332e;
+  --accent: #4cc2a8; --accent-ink: #06241d; --out: #f08a5d; --out-bg: #2c1d16;
+  --fridge: #6bb4ea; --freezer: #9a9af0; --cup: #e0b25c; --shadow: 0 6px 24px rgba(0, 0, 0, .5);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 16px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 96px;
+}
+.wrap { max-width: 640px; margin: 0 auto; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--bg); }
+header { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--bg); padding-top: 12px; }
+h1 { font-size: 22px; line-height: 1.1; margin: 0; font-weight: 700; letter-spacing: -.01em; }
+.top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.top small { color: var(--mute); font-size: 13px; }
+.search { margin: 10px 0 8px; }
+input, select, textarea, button { font: inherit; color: inherit; }
+input[type=search], input[type=text], input[type=number], input[type=date], select, textarea {
+  width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface);
+}
+textarea { resize: vertical; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tabs { display: flex; gap: 6px; overflow-x: auto; padding: 2px 0 10px; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.tab { flex: none; border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 7px 14px; font-weight: 500; font-size: 14px; cursor: pointer; }
+.tab[aria-selected=true] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.tab .n { margin-left: 6px; font-variant-numeric: tabular-nums; opacity: .7; }
+.group { margin-top: 18px; }
+.group h2 { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--mute); }
+.group h2::before { content: ""; width: 10px; height: 10px; border-radius: 3px; background: var(--c, var(--mute)); }
+.group h2 span { margin-left: auto; font-variant-numeric: tabular-nums; font-weight: 500; letter-spacing: 0; }
+.row { display: flex; align-items: center; gap: 6px; min-height: 60px; padding: 6px 0; border-bottom: 1px solid var(--line); -webkit-tap-highlight-color: transparent; }
+.main { flex: 1; min-width: 0; }
+.nm { font-weight: 500; overflow-wrap: anywhere; line-height: 1.25; }
+.meta { font-size: 12.5px; color: var(--mute); margin-top: 2px; }
+.qty { display: flex; align-items: baseline; gap: 4px; padding: 6px 10px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); white-space: nowrap; }
+.qty i { font-style: normal; color: var(--mute); font-size: 13px; }
+.qty b { font-size: 20px; font-variant-numeric: tabular-nums; line-height: 1; }
+.qty span { font-size: 12.5px; color: var(--mute); }
+.b { flex: none; min-width: 40px; height: 40px; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; font-weight: 700; cursor: pointer; padding: 0 10px; }
+.b.tom { color: var(--out); font-size: 13px; }
+.b.ed { color: var(--mute); border-color: transparent; background: transparent; min-width: 32px; padding: 0 4px; }
+.row.out .nm { color: var(--mute); }
+.tadd { display: flex; gap: 8px; margin: 4px 0 4px; }
+.trow { display: flex; align-items: center; gap: 6px; min-height: 52px; padding: 4px 0; border-bottom: 1px solid var(--line); }
+.tbox { flex: none; width: 40px; height: 40px; border: 0; background: none; padding: 0; display: grid; place-items: center; cursor: pointer; }
+.tbox i { width: 24px; height: 24px; border: 2px solid var(--mute); border-radius: 6px; display: grid; place-items: center; color: transparent; }
+.tbox i svg { width: 16px; height: 16px; }
+.tbox[aria-pressed=true] i { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.ttext { flex: 1; min-width: 0; overflow-wrap: anywhere; line-height: 1.3; cursor: pointer; }
+.trow.done .ttext { color: var(--mute); text-decoration: line-through; }
+.trow .b[disabled] { opacity: .3; cursor: default; }
+.tempty { color: var(--mute); margin: 10px 0 18px; }
+#tstat.err { color: var(--out); }
+.row.out .qty { background: var(--out-bg); border-color: transparent; }
+.row.out .qty b { color: var(--out); }
+.metaline { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; margin-top: 3px; }
+.metaline .meta { margin-top: 0; }
+.cart { flex: none; width: 32px; height: 26px; border: 1px solid var(--line); background: var(--surface); color: var(--mute); border-radius: 8px; padding: 0; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.cart[aria-pressed=true] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.cart svg { width: 16px; height: 16px; }
+.chk { display: flex; gap: 10px; align-items: center; grid-column: 1 / -1; font-size: 15px; }
+.chk input { width: 20px; height: 20px; accent-color: var(--accent); }
+.empty { margin: 36px 0; color: var(--mute); text-align: center; line-height: 1.5; }
+.fab { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 25; border: 0; background: var(--accent); color: var(--accent-ink); border-radius: 999px; padding: 14px 20px; font-weight: 700; box-shadow: var(--shadow); cursor: pointer; }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(76px + env(safe-area-inset-bottom, 0px)); z-index: 40; display: flex; gap: 14px; align-items: center; background: var(--ink); color: var(--bg); padding: 10px 14px; border-radius: 12px; box-shadow: var(--shadow); max-width: calc(100% - 32px); font-size: 14px; }
+.toast button { background: none; border: 0; color: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; padding: 0; }
+.scrim { position: fixed; inset: 0; z-index: 50; background: rgba(0, 0, 0, .45); display: flex; align-items: flex-end; justify-content: center; }
+.sheet { width: 100%; max-width: 560px; max-height: 92%; overflow-y: auto; background: var(--surface); border-radius: 18px 18px 0 0; padding: 18px 16px calc(18px + env(safe-area-inset-bottom, 0px)); }
+.sheet h2 { margin: 0 0 12px; font-size: 18px; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.grid .full { grid-column: 1 / -1; }
+label.f { display: block; font-size: 12.5px; color: var(--mute); }
+label.f > :last-child { margin-top: 4px; color: var(--ink); }
+.dwrap { display: flex; gap: 6px; }
+.cal { position: relative; flex: none; width: 42px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); display: grid; place-items: center; font-size: 18px; }
+.cal input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; padding: 0; border: 0; cursor: pointer; }
+.btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 11px 16px; font-weight: 700; cursor: pointer; }
+.btn.pri { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.danger { color: var(--out); margin-left: auto; }
+.btn[disabled] { opacity: .5; cursor: default; }
+.hint { color: var(--mute); font-size: 13px; line-height: 1.45; margin: 8px 0 0; }
+.rline { padding: 12px 0; border-bottom: 1px solid var(--line); display: grid; gap: 8px; }
+.rline.skip { opacity: .45; }
+.rhead { display: flex; gap: 10px; align-items: flex-start; }
+.rhead input[type=checkbox] { width: 22px; height: 22px; margin-top: 1px; accent-color: var(--accent); flex: none; }
+.rname { font-weight: 500; overflow-wrap: anywhere; }
+.rsub { font-size: 12.5px; color: var(--mute); }
+.tag { display: inline-block; font-size: 11.5px; font-weight: 700; padding: 1px 7px; border-radius: 6px; background: var(--line); color: var(--ink); margin-left: 6px; letter-spacing: .02em; }
+.tag.new { background: var(--accent); color: var(--accent-ink); }
+.rctl { display: grid; grid-template-columns: 1fr 96px; gap: 8px; align-items: end; }
+.banner { margin: 12px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--out-bg); color: var(--out); font-size: 14px; }
+.filebtn { position: relative; overflow: hidden; }
+.filebtn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+@media (prefers-reduced-motion: no-preference) { .toast, .sheet { animation: rise .16s ease-out; } @keyframes rise { from { opacity: 0; transform: translate(var(--tx, 0), 12px); } } .toast { --tx: -50%; } }
+
+body { margin: 0; }
+[hidden] { display: none !important; }
+.linkb { height: 30px; min-width: 0; font-size: 13px; font-weight: 500; color: var(--mute); }
+.top { align-items: center; }
+.top small { margin-left: auto; }
+.linkb.dirty { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+#filebar .banner { margin: 6px 0 0; background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
+#filebar .banner.warn { background: var(--out-bg); color: var(--out); border-color: transparent; }
+#filebar .fs { font-size: 12.5px; color: var(--mute); margin: 6px 0 0; }
+#filebar .btns { margin-top: 10px; }
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="top"><h1>Kitchen Stock</h1><small id="count"></small><button class="b linkb" id="savehtml" hidden>Save</button><button class="b linkb" id="syncbtn">Sync</button><button class="b linkb" id="backup">Backup</button></div>
+    <div class="search"><input type="search" id="q" placeholder="Search items" aria-label="Search items"></div>
+    <div class="tabs" id="tabs" role="tablist"></div>
+  </header>
+  <main><div id="filebar"></div>
+    <div id="list"></div>
+    <section id="rcpt" hidden>
+      <div class="group"><h2 style="--c: var(--accent)">Add a receipt</h2></div>
+      <textarea id="rtext" rows="7" placeholder="Paste the receipt text from the Kiwi app or e-mail here"></textarea>
+      <div class="btns">
+        <button class="btn pri" id="rread">Read text</button>
+        <label class="btn filebtn" id="rimgwrap" hidden>Read screenshot (uses Claude)<input type="file" id="rfile" accept="image/*"></label>
+      </div>
+      <p class="hint">The text is read here with fixed rules, so it works offline. Copy the lines from the Kiwi app or the receipt e-mail, with the date and Kvitteringsnr. if you can.</p>
+      <div id="rreview"></div>
+    </section>
+    <section id="todo" hidden>
+      <form id="tform" class="tadd" autocomplete="off"><input type="text" id="tnew" placeholder="Add a reminder" aria-label="Add a reminder"><button class="btn pri" type="submit">Add</button></form>
+      <p class="hint" id="tstat"></p>
+      <div id="tlist"></div>
+    </section>
+  </main>
+</div>
+<button class="fab" id="fab">+ New item</button>
+<div id="toastbox"></div>
+<div id="sheetbox"></div>
+
+<script>
+/* Storage layer: the same calls the page used on claude.ai. Data lives in this browser; the Save button (Chrome/Edge) also writes it into this HTML file itself. */
+(function () {
+  var KEY = 'kitchen-stock-v1', TKEY = KEY + '-t';
+  var EMBED = /*SEED-START*/{"savedAt":0,"data":{}}/*SEED-END*/;
+  var data = null, lt = 0;
+  try { data = JSON.parse(localStorage.getItem(KEY) || 'null'); lt = Number(localStorage.getItem(TKEY) || 0); } catch (e) { data = null; }
+  if (data && !lt) { lt = Date.now(); try { localStorage.setItem(TKEY, String(lt)); } catch (e) { /* ignore */ } }  // older copy without a timestamp: keep what the browser has
+  var unsaved = false;
+  function cache() { try { localStorage.setItem(KEY, JSON.stringify(data)); localStorage.setItem(TKEY, String(lt)); } catch (e) { window.__ksNoSave = true; } }
+  if (!data || typeof data !== 'object' || EMBED.savedAt > lt) { data = JSON.parse(JSON.stringify(EMBED.data)); lt = EMBED.savedAt; cache(); }  // the page file is newer than the browser copy (or the browser is empty)
+  var syncOn = false; try { syncOn = !!localStorage.getItem('kitchen-stock-gh'); } catch (e) { /* ignore */ }
+  if (EMBED.add && !syncOn) {  // items added to the page file that this browser copy does not have yet: add them without touching anything else
+    var added = 0;
+    Object.keys(EMBED.add).forEach(function (k) { if (!(k in data)) { data[k] = JSON.parse(JSON.stringify(EMBED.add[k])); added++; } });
+    if (added) { lt = Math.max(lt, Date.now()); cache(); }
+  }
+  unsaved = lt > EMBED.savedAt;
+  var subs = [];
+  function notify() { setTimeout(function () { subs.slice().forEach(function (f) { f(); }); }, 0); }
+  function kids(col) { return Object.keys(data).filter(function (k) { return k.indexOf(col + '/') === 0 && k.indexOf('/', col.length + 1) < 0; }); }
+  function snap(k) { var d = data[k]; return { id: k.split('/').pop(), exists: d !== undefined, data: function () { return d === undefined ? undefined : JSON.parse(JSON.stringify(d)); } }; }
+  function sub(f) { subs.push(f); notify(); return function () { subs = subs.filter(function (x) { return x !== f; }); }; }
+  function persist() { lt = Date.now(); unsaved = true; cache(); button(); }
+
+  /* ----- Save into the HTML file (Chrome / Edge) ----- */
+  var canFS = typeof window.showOpenFilePicker === 'function' && !!window.indexedDB;
+  var busy = false;
+  var PICK = { types: [{ description: 'Kitchen Stock page', accept: { 'text/html': ['.html', '.htm'] } }] };
+  function idb() { return new Promise(function (res, rej) { var r = indexedDB.open('kitchen-stock-fs', 1); r.onupgradeneeded = function () { r.result.createObjectStore('kv'); }; r.onsuccess = function () { res(r.result); }; r.onerror = function () { rej(r.error); }; }); }
+  async function kvGet(k) { var d = await idb(); return new Promise(function (res) { var t = d.transaction('kv').objectStore('kv').get(k); t.onsuccess = function () { res(t.result); }; t.onerror = function () { res(null); }; }); }
+  async function kvSet(k, v) { var d = await idb(); return new Promise(function (res, rej) { var t = d.transaction('kv', 'readwrite'); t.objectStore('kv').put(v, k); t.oncomplete = res; t.onerror = function () { rej(t.error); }; }); }
+  function marker() { return new RegExp('/\\*SEED-' + 'START\\*/[\\s\\S]*?/\\*SEED-' + 'END\\*/'); }
+  function say(msg, bad) {
+    var el = document.getElementById('filebar'); if (!el) return;
+    el.innerHTML = msg ? (bad ? '<div class="banner warn"></div>' : '<p class="fs"></p>') : '';
+    if (msg) el.firstChild.textContent = msg;
+  }
+  function button() {
+    var b = document.getElementById('savehtml'); if (!b) return;
+    if (gh && gh.token) { b.hidden = true; return; }
+    b.hidden = false;
+    b.textContent = busy ? 'Saving…' : unsaved ? (canFS ? 'Save ●' : 'Save copy ●') : 'Saved ✓';
+    b.classList.toggle('dirty', unsaved && !busy);
+  }
+  async function write(handle) {
+    var html = await (await handle.getFile()).text();
+    var re = marker();
+    if (!re.test(html)) throw new Error('That file is not the Kitchen Stock page. Choose kitchen-stock.html.');
+    var T = lt;
+    var block = '/*SEED-' + 'START*/' + JSON.stringify({ savedAt: T, data: data }).replace(/</g, '\\u003c') + '/*SEED-' + 'END*/';
+    var w = await handle.createWritable();
+    await w.write(html.replace(re, function () { return block; }));
+    await w.close();
+    EMBED.savedAt = T; unsaved = lt > T;
+  }
+  /* The page as it was loaded: the live copy of the document with the screens it drew cleared out, and the stock block refreshed. */
+  function pageHtml(T) {
+    var c = document.documentElement.cloneNode(true);
+    ['tabs', 'list', 'rreview', 'filebar', 'sheetbox', 'toastbox', 'count', 'tlist', 'tstat'].forEach(function (id) { var e = c.querySelector('#' + id); if (e) e.textContent = ''; });
+    ['rcpt', 'todo', 'rimgwrap', 'savehtml'].forEach(function (id) { var e = c.querySelector('#' + id); if (e) e.setAttribute('hidden', ''); });
+    var sy = c.querySelector('#syncbtn'); if (sy) sy.textContent = 'Sync';
+    ['fab'].forEach(function (id) { var e = c.querySelector('#' + id); if (e) e.removeAttribute('hidden'); });
+    var s = c.querySelector('.search'); if (s) s.removeAttribute('hidden');
+    var l = c.querySelector('#list'); if (l) l.removeAttribute('hidden');
+    var t = c.querySelector('#rtext'); if (t) t.textContent = '';
+    var sb = c.querySelector('#savehtml'); if (sb) { sb.textContent = 'Save'; sb.className = 'b linkb'; }
+    var block = '/*SEED-' + 'START*/' + JSON.stringify({ savedAt: T, data: data }).replace(/</g, '\\u003c') + '/*SEED-' + 'END*/';
+    return ('<!doctype html>\n' + c.outerHTML).replace(marker(), function () { return block; });
+  }
+  function downloadCopy() {
+    var T = lt, html = pageHtml(T);
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+    a.download = 'kitchen-stock.html';
+    document.body.appendChild(a); a.click(); a.remove();
+    EMBED.savedAt = T; unsaved = lt > T;
+    say('Downloaded kitchen-stock.html with your stock inside. Open that copy to use it, and delete the older one.');
+    button();
+  }
+  async function saveToHtml(override) {
+    if (busy) return;
+    if (!canFS && !override) { downloadCopy(); return; }
+    busy = true; button(); say('');
+    try {
+      var h = override || await kvGet('html');
+      if (!h) {
+        say('Choose this page’s file (kitchen-stock.html) so Save can update it.');
+        h = (await window.showOpenFilePicker(PICK))[0];
+        try { await kvSet('html', h); } catch (e) { /* remembering the file is a convenience */ }
+      } else if (!override && (await h.queryPermission({ mode: 'readwrite' })) !== 'granted' && (await h.requestPermission({ mode: 'readwrite' })) !== 'granted') {
+        throw new Error('Chrome did not give permission to edit the file.');
+      }
+      try { await write(h); }
+      catch (e) {
+        if (e && e.name === 'NotFoundError') { try { await kvSet('html', null); } catch (e2) { /* ignore */ } throw new Error('The page file moved. Press Save again and choose it.'); }
+        throw e;
+      }
+      var d = new Date();
+      say('Saved into ' + (h.name || 'the page file') + ' at ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'));
+    } catch (e) {
+      if (!(e && e.name === 'AbortError')) say(String((e && e.message) || e), true); else say('');
+    }
+    busy = false; button();
+  }
+  /* ----- Sync between devices: the stock lives in stock.json on the "data" branch of the GitHub repo ----- */
+  var GH_KEY = 'kitchen-stock-gh', DK = 'kitchen-stock-dirty';
+  var GH_DEFAULT = { repo: 'svenni702/Svenni-data', branch: 'main', path: 'stock.json' };  // private repo: only tokens with access can read it
+  var gh = null, dirty = { set: {}, del: {} }, syncing = false, syncT = null, lastErr = '', ghSha = null, hadErr = false;
+  try { gh = JSON.parse(localStorage.getItem(GH_KEY) || 'null'); dirty = JSON.parse(localStorage.getItem(DK) || 'null') || dirty; } catch (e) { /* ignore */ }
+  if (gh && (gh.repo !== GH_DEFAULT.repo || gh.branch !== GH_DEFAULT.branch)) {  // devices set up before the stock moved to the private repo
+    gh.repo = GH_DEFAULT.repo; gh.branch = GH_DEFAULT.branch; gh.path = GH_DEFAULT.path;
+    try { localStorage.setItem(GH_KEY, JSON.stringify(gh)); } catch (e) { /* ignore */ }
+  }
+  function saveDirty() { try { localStorage.setItem(DK, JSON.stringify(dirty)); } catch (e) { /* ignore */ } }
+  function pending() { return Object.keys(dirty.set).length + Object.keys(dirty.del).length; }
+  function mark(k, gone) {
+    if (gone) { dirty.del[k] = (dirty.del[k] || 0) + 1; delete dirty.set[k]; }
+    else { dirty.set[k] = (dirty.set[k] || 0) + 1; delete dirty.del[k]; }
+    saveDirty(); schedule();
+  }
+  function syncUi() {
+    var b = document.getElementById('syncbtn'); if (!b) return;
+    var on = !!(gh && gh.token);
+    b.textContent = !on ? 'Set up sync' : syncing ? 'Syncing…' : lastErr ? 'Sync ⚠' : pending() ? 'Sync ●' : 'Synced ✓';
+    b.title = lastErr || '';
+    b.classList.toggle('dirty', on && !syncing && (!!lastErr || pending() > 0));
+  }
+  function enc(str) { return btoa(unescape(encodeURIComponent(str))); }
+  function dec(b64) { return decodeURIComponent(escape(atob(String(b64).replace(/\s/g, '')))); }
+  function api(method, body) {
+    var url = 'https://api.github.com/repos/' + gh.repo + '/contents/' + gh.path + (method === 'GET' ? '?ref=' + encodeURIComponent(gh.branch) + '&t=' + Date.now() : '');
+    return fetch(url, { method: method, cache: 'no-store', headers: { 'Authorization': 'Bearer ' + gh.token, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+  }
+  function refused(r) { return r.status === 401 || r.status === 403; }
+  async function pull() {
+    var r = await api('GET');
+    if (r.status === 404) {  // no file yet, or a token that cannot see the private repo (GitHub answers 404 for both)
+      var rr = await fetch('https://api.github.com/repos/' + gh.repo, { cache: 'no-store', headers: { 'Authorization': 'Bearer ' + gh.token, 'Accept': 'application/vnd.github+json' } });
+      if (!rr.ok) throw new Error('This token cannot reach ' + gh.repo + '. On GitHub, edit the token and add ' + gh.repo + ' under Repository access.');
+      ghSha = null; return null;
+    }
+    if (refused(r)) throw new Error('GitHub did not accept the token. It needs permission to edit the contents of ' + gh.repo + '.');
+    if (!r.ok) throw new Error('GitHub error ' + r.status);
+    var j = await r.json(); ghSha = j.sha;
+    return JSON.parse(dec(j.content));
+  }
+  function applyRemote(rem) {
+    var nd = JSON.parse(JSON.stringify(rem.data || {}));
+    Object.keys(dirty.set).forEach(function (k) { if (k in data) nd[k] = data[k]; });
+    Object.keys(dirty.del).forEach(function (k) { delete nd[k]; });
+    if (JSON.stringify(nd) !== JSON.stringify(data)) { data = nd; cache(); notify(); }
+  }
+  async function sync() {
+    if (!gh || !gh.token || syncing) return;
+    syncing = true; syncUi();
+    try {
+      for (var attempt = 0; attempt < 4; attempt++) {
+        var rem = await pull();
+        var snapSet = Object.assign({}, dirty.set), snapDel = Object.assign({}, dirty.del);
+        if (rem) applyRemote(rem);
+        else Object.keys(data).forEach(function (k) { dirty.set[k] = snapSet[k] = (dirty.set[k] || 1); });
+        if (rem && !pending()) { lastErr = ''; break; }
+        var body = { message: 'Update stock', content: enc(JSON.stringify({ savedAt: Date.now(), data: data })), branch: gh.branch };
+        if (ghSha) body.sha = ghSha;
+        var r = await api('PUT', body);
+        if (r.status === 409 || r.status === 422) continue;  // changed on another device meanwhile: pull again and retry
+        if (refused(r)) throw new Error('GitHub did not accept the token. It needs permission to edit the contents of ' + gh.repo + '.');
+        if (!r.ok) throw new Error('GitHub error ' + r.status);
+        var j = await r.json(); ghSha = j.content.sha;
+        Object.keys(snapSet).forEach(function (k) { if (dirty.set[k] === snapSet[k]) delete dirty.set[k]; });
+        Object.keys(snapDel).forEach(function (k) { if (dirty.del[k] === snapDel[k]) delete dirty.del[k]; });
+        saveDirty(); lastErr = ''; break;
+      }
+      if (hadErr && !lastErr) { say(''); hadErr = false; }
+    } catch (e) {
+      lastErr = (e && e.message === 'Failed to fetch') ? 'Offline. Changes are kept on this device and sync when you are back online.' : String((e && e.message) || e);
+      hadErr = true; say(lastErr, true);
+    }
+    syncing = false; syncUi();
+    if (pending() && !lastErr) schedule();
+  }
+  function schedule() { if (!gh || !gh.token) { syncUi(); return; } clearTimeout(syncT); syncT = setTimeout(sync, 1500); syncUi(); }
+  async function connect() {
+    var t = prompt('Paste your GitHub token. It needs permission to edit the contents of ' + GH_DEFAULT.repo + ', and stays on this device only.');
+    if (!t || !t.trim()) return;
+    gh = { token: t.trim(), repo: GH_DEFAULT.repo, branch: GH_DEFAULT.branch, path: GH_DEFAULT.path };
+    try {
+      var rem = await pull();
+      if (rem) {
+        if (!confirm('Turn on sync?\n\nThis device will switch to the shared stock, and what is on this device now will be replaced by it.')) { gh = null; syncUi(); return; }
+        dirty = { set: {}, del: {} }; data = JSON.parse(JSON.stringify(rem.data || {})); cache(); notify();
+      }
+      localStorage.setItem(GH_KEY, JSON.stringify(gh)); saveDirty();
+      say('Sync is on. Changes now go to the online stock.'); button(); sync(); window.dispatchEvent(new Event('ks-sync'));
+    } catch (e) {
+      gh = null; say(String((e && e.message) === 'Failed to fetch' ? 'Could not reach GitHub. Check your connection.' : (e && e.message) || e), true); syncUi();
+    }
+  }
+  document.getElementById('syncbtn').onclick = function () {
+    if (!gh || !gh.token) { connect(); return; }
+    var a = prompt('Sync is on. Leave this empty to sync now, or type OFF to turn sync off on this device.');
+    if (a === null) return;
+    if (/^off$/i.test(a.trim())) { gh = null; try { localStorage.removeItem(GH_KEY); } catch (e) { /* ignore */ } dirty = { set: {}, del: {} }; saveDirty(); say('Sync is off on this device.'); button(); syncUi(); window.dispatchEvent(new Event('ks-sync')); return; }
+    sync();
+  };
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) sync(); });
+  window.addEventListener('online', sync);
+  setInterval(function () { if (!document.hidden) sync(); }, 30000);
+  syncUi(); if (gh && gh.token) setTimeout(sync, 400);
+
+  document.getElementById('savehtml').onclick = function () { saveToHtml(); };
+  button();
+
+  var db = {
+    doc: function (p) {
+      return {
+        get: async function () { return snap(p); },
+        set: async function (d) { data[p] = JSON.parse(JSON.stringify(d)); persist(); mark(p); notify(); },
+        update: async function (d) { if (!(p in data)) throw { code: 'invalid_argument' }; Object.assign(data[p], JSON.parse(JSON.stringify(d))); persist(); mark(p); notify(); },
+        delete: async function () { delete data[p]; persist(); mark(p, true); notify(); },
+        onSnapshot: function (n) { return sub(function () { n(snap(p)); }); }
+      };
+    },
+    collection: function (c) { return { onSnapshot: function (n) { return sub(function () { n({ docs: kids(c).map(snap) }); }); } }; }
+  };
+  window.claude = { use: async function (name) { return name === 'db' ? db : null; } };
+  window.__ks = {
+    dump: function () { return JSON.stringify({ app: 'kitchen-stock', version: 1, data: data }, null, 1); },
+    load: function (obj) { var old = Object.keys(data); data = obj; persist(); Object.keys(data).forEach(function (k) { mark(k); }); old.forEach(function (k) { if (!(k in data)) mark(k, true); }); notify(); },
+    fileName: function () { return ''; },
+    saveWith: saveToHtml,
+    pageHtml: function () { return pageHtml(lt); },
+    state: function () { return { unsaved: unsaved, embedSavedAt: EMBED.savedAt, lt: lt, sync: !!(gh && gh.token), pending: pending() }; },
+    syncNow: sync
+  };
+})();
+</script>
+<script>
+(async function () {
+  var $ = function (s) { return document.querySelector(s); };
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  var LOCS = ['Fridge', 'Freezer', 'Drawer 2', 'Drawer 3', 'Drawer L', 'Dry storage', 'Other'];
+  var CUP = ['Drawer 2', 'Drawer 3', 'Drawer L', 'Dry storage'];
+  var LOCCOLOR = { 'Fridge': 'var(--fridge)', 'Freezer': 'var(--freezer)' };
+  var UNITS = ['stk', 'pk', 'fl', 'g', 'kg', 'l', 'm'];
+  var CART = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.6 12.4a1 1 0 0 0 1 .8h9.2a1 1 0 0 0 1-.8L21 7H6"/></svg>';
+  var TABS = [['have', 'In stock'], ['all', 'All'], ['Fridge', 'Fridge'], ['Freezer', 'Freezer'], ['cup', 'Cupboards'], ['shop', 'Shopping list'], ['todo', 'To do'], ['rcpt', 'Receipt']];
+  var state = { items: new Map(), aliases: new Map(), receipts: [], tab: 'all', q: '', rcpt: null, loaded: false, db: null };
+
+  /* ---------- helpers ---------- */
+  function norm(s) { return String(s).toLowerCase().replace(/ /g, ' ').replace(/\s+/g, ' ').trim(); }
+  function round(x) { return Math.round(x * 1000) / 1000; }
+  function fmt(x) { x = round(Number(x) || 0); return String(x).replace('.', ','); }
+  function num(v) { var n = parseFloat(String(v).replace(',', '.')); return isNaN(n) ? 0 : n; }
+  function hid(s) { var h = 5381; for (var i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0; return h.toString(36); }
+  function aliasId(key) { return 'a' + hid(key) + hid(key.split('').reverse().join('')); }
+  function newId() { return 'i' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+  function stepOf(it) { return it.step > 0 ? it.step : (it.unit === 'g' ? 100 : 1); }
+  function locGroup(l) { return CUP.indexOf(l) >= 0 ? 'cup' : l; }
+  function dmy(iso) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? m[3] + '.' + m[2] + '.' + m[1] : (iso || ''); }
+  function isoOf(txt) {  // dd.mm.yyyy (also d.m.yy, / or - between) to yyyy-mm-dd; '' for empty, null if it is not a real date
+    txt = String(txt || '').trim(); if (!txt) return '';
+    var m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(txt), y, mo, d;
+    if (m) { y = +m[1]; mo = +m[2]; d = +m[3]; }
+    else { m = /^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{2}|\d{4})$/.exec(txt); if (!m) return null; d = +m[1]; mo = +m[2]; y = +m[3]; if (y < 100) y += 2000; }
+    var t = new Date(y, mo - 1, d); if (t.getFullYear() !== y || t.getMonth() !== mo - 1 || t.getDate() !== d) return null;
+    return y + '-' + String(mo).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+  }
+  function dateField(label, id, iso) {
+    iso = /^\d{4}-\d{2}-\d{2}$/.test(iso || '') ? iso : '';
+    return '<label class="f">' + label + '<span class="dwrap"><input type="text" inputmode="numeric" placeholder="dd.mm.åååå" id="' + id + '" value="' + dmy(iso) + '">' +
+      '<span class="cal" aria-hidden="true">📅<input type="date" tabindex="-1" data-for="' + id + '" value="' + iso + '"></span></span></label>';
+  }
+  function today() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
+
+  /* ---------- receipt reading (fixed rules) ---------- */
+  var RE_QTY = /^(\d+(?:[.,]\d+)?)\s*(stk|kg|g|l|pk)$/i;
+  var RE_PRICE = /^-?\d[\d\s]*[.,]\d{2}\s*(kr)?$/i;
+  var RE_TRAIL_PRICE = /\s+-?\d[\d\s]*[.,]\d{2}\s*kr$/i;
+  var RE_BONUS_TAIL = /\s*\d+\s*%\s*trumf-bonus.*$/i;
+  var RE_BONUS = /trumf-bonus|^\d+\s*%/i;
+  var RE_END = /^(kjøpesum|total|sum)\b/i;
+  var RE_DATE = /(\d{1,2})\.(\d{1,2})\.(\d{4})/;
+  var SKIP_RE = /\bpant\b|^rabatt|trumf/i;
+
+  function parseReceipt(text) {
+    var m = String(text).match(/kvitteringsnr\.?:?\s*(\d+)/i);
+    var out = { items: [], date: null, number: m ? m[1] : null };
+    var cur = null;
+    var lines = String(text).split(/\r?\n/);
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i].replace(/ /g, ' ').trim();
+      if (!line) continue;
+      var dm = line.match(RE_DATE);
+      if (dm && !out.date) { out.date = dm[3] + '-' + dm[2].padStart(2, '0') + '-' + dm[1].padStart(2, '0'); continue; }
+      if (RE_END.test(line)) break;
+      line = line.replace(RE_BONUS_TAIL, '').trim();
+      if (!line) continue;
+      var qm = line.replace(RE_TRAIL_PRICE, '').trim().match(RE_QTY);
+      if (qm) {
+        if (cur && !cur.set) { cur.qty = parseFloat(qm[1].replace(',', '.')); cur.unit = qm[2].toLowerCase(); cur.set = true; }
+        continue;
+      }
+      if (RE_BONUS.test(line) || RE_PRICE.test(line)) continue;
+      if (!out.items.length && /^(kiwi|rema|coop|meny|spar|joker)\b/i.test(line)) continue;
+      cur = { name: line.replace(RE_TRAIL_PRICE, '').trim(), qty: 1, unit: 'stk', set: false };
+      out.items.push(cur);
+    }
+    out.items.forEach(function (it) { delete it.set; });
+    return out;
+  }
+
+  var STOP = ['stk', 'pk', 'kg', 'fl', 'stor', 'store', 'original'];
+  function tokens(s) {
+    var set = new Set();
+    (norm(s).match(/[a-zæøåéè&]+/g) || []).forEach(function (t) { if (t.length > 2 && STOP.indexOf(t) < 0) set.add(t); });
+    return set;
+  }
+  var RULES = [
+    [/findus|frossen|fryst|iskrem|fiskepinn|baconburger|burger(?!brød)|pizza|wok|kjøttkake|karbonade|fiskegrateng|hjortekj|biffstrimler|løvbiff|kjøttdeig/i, 'Freezer', 'Middag'],
+    [/cola|fanta|sprite|juice|saft|øl\b|beer|vann\b|solo\b|farris/i, 'Fridge', 'Drikke'],
+    [/melk|yogurt|yoghurt|rømme|fløte|egg\b|smør|ost\b|leverpostei|pålegg|skinke|salami/i, 'Fridge', 'Lunsj/kvelds'],
+    [/pølse|bacon|kylling|laks|torsk|fisk|kjøtt/i, 'Fridge', 'Middag'],
+    [/brød|tortilla|rundstykk|lefse|bolle/i, 'Fridge', 'Middag'],
+    [/banan|eple|appelsin|pære|druer|frukt|bær/i, 'Fridge', 'Lunsj/kvelds'],
+    [/kål|salat|paprika|agurk|tomat|løk|gulrot|brokkoli|potet|hvitløk|jalap|sopp|grønt/i, 'Fridge', 'Middag'],
+    [/kaffe|kapsel|\bte\b|teposer|kakao|nugatti|knekkebrød|nachos|pops|müsli|musli|frokost|honning|chips|snacks?\b|non stop|sjokolade|godteri/i, 'Drawer 2', 'Lunsj/kvelds'],
+    [/mel\b|sukker|bakepulver|vanilje|melis|\bris\b|pasta|nudler|makaron|spagetti|lasagne|buljong|hermetikk|salt\b|krydder|saus|ketchup/i, 'Drawer 3', 'Middag'],
+    [/toalett|tørke|oppvask|såpe|vaskemiddel|rengjør|vitamin/i, 'Dry storage', 'Bad/Vaskerom']
+  ];
+  function guessPlace(name) {
+    for (var i = 0; i < RULES.length; i++) if (RULES[i][0].test(name)) return { loc: RULES[i][1], cat: RULES[i][2] };
+    return { loc: 'Dry storage', cat: '' };
+  }
+  function guessUnit(name, runit) {
+    if (runit === 'g' || runit === 'kg') return 'g';
+    if (/x\s*\d+\s*fl\b/i.test(name)) return 'fl';
+    if (/\b\d+\s*pk\b/i.test(name)) return 'stk';
+    if (/\d+\s*stk/i.test(name)) return 'pk';
+    return 'stk';
+  }
+  function perGuess(name, unit) {
+    var m;
+    if (unit === 'fl' && (m = name.match(/x\s*(\d+)\s*fl\b/i))) return +m[1];
+    if (unit === 'stk' && (m = name.match(/\b(\d+)\s*pk\b/i))) return +m[1];
+    if (unit === 'stk' && (m = name.match(/(\d+)\s*stk/i))) return +m[1];
+    return 1;
+  }
+  function cleanName(n) { n = n.replace(/\s+(kg|stk)$/i, '').trim(); return n.charAt(0).toUpperCase() + n.slice(1); }
+  function findSimilar(name) {
+    var want = tokens(name), best = null, score = 0;
+    state.items.forEach(function (it) {
+      var have = tokens(it.name);
+      if (!have.size) return;
+      var all = true;
+      have.forEach(function (t) {
+        var ok = want.has(t);
+        if (!ok && t.length >= 4) want.forEach(function (w) { if (w.indexOf(t) === 0) ok = true; });  // "banan" in "bananer"
+        if (!ok) all = false;
+      });
+      if (all && have.size > score) { best = it; score = have.size; }
+    });
+    return best;
+  }
+  function calcAmount(l) {
+    var it = l.itemId !== 'new' ? state.items.get(l.itemId) : null;
+    var unit = it ? it.unit : l.newUnit;
+    if (l.runit === 'g') return round(unit === 'kg' ? l.rqty / 1000 : l.rqty);
+    if (l.runit === 'kg') return round(unit === 'g' ? l.rqty * 1000 : l.rqty);
+    return round(l.rqty * l.per);
+  }
+  function buildLines(parsed) {
+    return parsed.items.map(function (p) {
+      var key = norm(p.name), a = state.aliases.get(key), item = a && state.items.get(a.itemId), how = 'known';
+      var l = { raw: p.name, rqty: p.qty, runit: p.unit, include: !SKIP_RE.test(p.name), how: how };
+      if (!item) { item = findSimilar(p.name); l.how = item ? 'similar' : 'new'; }
+      if (item) {
+        l.itemId = item.id;
+        l.per = (a && a.itemId === item.id) ? (a.per || 1) : perGuess(p.name, item.unit);
+      } else {
+        var g = guessPlace(p.name);
+        l.itemId = 'new'; l.newName = cleanName(p.name); l.newLoc = g.loc; l.newCat = g.cat;
+        l.newUnit = guessUnit(p.name, p.unit); l.per = perGuess(p.name, l.newUnit);
+      }
+      l.amount = calcAmount(l);
+      return l;
+    });
+  }
+
+  /* ---------- writes ---------- */
+  var pending = new Map(), running = new Set();
+  function toast(msg, undo, extra) {
+    var box = $('#toastbox');
+    box.innerHTML = '<div class="toast" role="status"><span>' + esc(msg) + '</span>' + (undo ? '<button id="undo">Undo</button>' : '') + (extra ? '<button id="xtra">' + esc(extra.label) + '</button>' : '') + '</div>';
+    if (undo) $('#undo').onclick = function () { box.innerHTML = ''; undo(); };
+    if (extra) $('#xtra').onclick = function () { box.innerHTML = ''; extra.fn(); };
+    clearTimeout(toast.t);
+    toast.t = setTimeout(function () { box.innerHTML = ''; }, undo || extra ? 5000 : 3000);
+  }
+  async function pushItem(id) {
+    if (running.has(id)) return;
+    running.add(id);
+    try {
+      while (pending.has(id)) {
+        var v = pending.get(id); pending.delete(id);
+        await state.db.doc('items/' + id).update(v);
+      }
+    } catch (e) { toast('Could not save. Check your connection.'); }
+    running.delete(id);
+  }
+  /* Changes a few fields of one item right away on screen and writes them one batch at a time */
+  function patch(id, fields) {
+    var it = state.items.get(id); if (!it) return;
+    if ('qty' in fields) fields.updated = today();
+    Object.assign(it, fields);
+    pending.set(id, Object.assign(pending.get(id) || {}, fields));
+    render(); pushItem(id);
+  }
+  function setQty(id, qty, extra) {
+    var it = state.items.get(id); if (!it) return;
+    qty = Math.max(0, round(qty));
+    var prev = it.qty;
+    if (qty === prev) return;
+    patch(id, { qty: qty });
+    toast(it.name + ': ' + fmt(prev) + ' → ' + fmt(qty), function () { setQty(id, prev); }, extra);
+  }
+  function setShop(id, on) {
+    var it = state.items.get(id); if (!it || !!it.shop === on) return;
+    patch(id, { shop: on });
+    toast(on ? 'Added ' + it.name + ' to the shopping list' : 'Removed ' + it.name + ' from the list', function () { setShop(id, !on); });
+  }
+
+  /* ---------- list ---------- */
+  function visible() {
+    var q = norm(state.q), out = [];
+    state.items.forEach(function (it) {
+      if (q && norm(it.name + ' ' + (it.cat || '') + ' ' + it.loc).indexOf(q) < 0) return;
+      if (state.tab === 'shop') { if (!it.shop) return; }
+      else if (state.tab === 'have') { if (it.qty <= 0) return; }
+      else if (state.tab === 'cup') { if (locGroup(it.loc) !== 'cup') return; }
+      else if (state.tab !== 'all' && it.loc !== state.tab) return;
+      out.push(it);
+    });
+    return out;
+  }
+  function rowHtml(it, shop) {
+    var out = it.qty <= 0;
+    var meta = [it.cat, it.bought ? (out ? 'last bought ' : 'bought ') + dmy(it.bought) : '', it.updated ? 'updated ' + dmy(it.updated) : ''].filter(Boolean).join(' · ');
+    return '<div class="row' + (out ? ' out' : '') + '" data-id="' + esc(it.id) + '">' +
+      '<div class="main"><div class="nm">' + esc(it.name) + '</div><div class="metaline"><span class="meta">' + esc(meta) + '</span>' +
+      '<button class="cart" data-act="list" aria-pressed="' + (!!it.shop) + '" aria-label="' + (it.shop ? 'Remove from' : 'Add to') + ' shopping list">' + CART + '</button></div></div>' +
+      (out || shop ? '' : '<button class="b" data-act="dec" aria-label="Remove ' + fmt(stepOf(it)) + '">−</button>') +
+      '<div class="qty"><b>' + fmt(it.qty) + '</b><span>' + esc(it.unit) + '</span></div>' +
+      '<button class="b" data-act="inc" aria-label="Add ' + fmt(stepOf(it)) + '">' + (shop ? 'Bought' : '+') + '</button>' +
+      (out ? '' : '<button class="b tom" data-act="out" aria-label="Mark as out">Out</button>') +
+      '<button class="b ed" data-act="edit" aria-label="Edit ' + esc(it.name) + '">⋯</button></div>';
+  }
+  function render() {
+    if (state.tab === 'todo' && !todoOn()) state.tab = 'have';
+    var tabsHtml = TABS.filter(function (t) { return t[0] !== 'todo' || todoOn(); }).map(function (t) {
+      var n = '';
+      if (t[0] === 'shop') { var c = 0; state.items.forEach(function (it) { if (it.shop) c++; }); n = c ? '<span class="n">' + c + '</span>' : ''; }
+      return '<button class="tab" role="tab" data-tab="' + t[0] + '" aria-selected="' + (state.tab === t[0]) + '">' + t[1] + n + '</button>';
+    }).join('');
+    $('#tabs').innerHTML = tabsHtml;
+    var isR = state.tab === 'rcpt', isT = state.tab === 'todo', other = isR || isT;
+    $('#rcpt').hidden = !isR; $('#todo').hidden = !isT; $('#list').hidden = other; $('.search').hidden = other; $('#fab').hidden = other;
+    var total = 0, stocked = 0; state.items.forEach(function (it) { total++; if (it.qty > 0) stocked++; });
+    $('#count').textContent = total ? stocked + ' of ' + total + ' in stock' : '';
+    if (isR) return;
+    if (isT) { renderTodo(); return; }
+
+    if (!state.loaded) { $('#list').innerHTML = '<p class="empty">Loading…</p>'; return; }
+    if (!state.db) { $('#list').innerHTML = '<p class="empty">Storage is not available here. Open this page signed in to claude.ai.</p>'; return; }
+    var items = visible();
+    if (!items.length) {
+      $('#list').innerHTML = state.items.size
+        ? '<p class="empty">' + (state.tab === 'shop' ? 'Your shopping list is empty. Tap the cart on an item to add it.' : state.tab === 'have' && !state.q ? 'Nothing in stock right now.' : 'No items match.') + '</p>'
+        : todoOn() ? '<p class="empty">No items yet.<br>Add one with “+ New item”, or paste a receipt on the Receipt tab.</p>'
+        : '<p class="empty">This stock is private.<br>Tap “Set up sync” at the top and paste your token to see it.</p>';
+      return;
+    }
+    var groups = {};
+    items.forEach(function (it) { (groups[it.loc] = groups[it.loc] || []).push(it); });
+    var order = LOCS.concat(Object.keys(groups).filter(function (l) { return LOCS.indexOf(l) < 0; }));
+    var html = '';
+    order.forEach(function (loc) {
+      var g = groups[loc]; if (!g) return;
+      g.sort(function (a, b) { return (a.qty <= 0) - (b.qty <= 0) || a.name.localeCompare(b.name, 'nb'); });
+      html += '<section class="group"><h2 style="--c:' + (LOCCOLOR[loc] || 'var(--cup)') + '">' + esc(loc) + '<span>' + g.length + '</span></h2>' + g.map(function (it) { return rowHtml(it, state.tab === 'shop'); }).join('') + '</section>';
+    });
+    $('#list').innerHTML = html;
+  }
+
+  /* ---------- edit sheet ---------- */
+  function openSheet(id) {
+    var it = id ? state.items.get(id) : { name: '', loc: state.tab === 'Freezer' ? 'Freezer' : state.tab === 'cup' ? 'Drawer 2' : 'Fridge', cat: '', qty: 1, unit: 'stk', step: 0, best: '', shop: state.tab === 'shop' };
+    if (!it) return;
+    var cats = Array.from(new Set(Array.from(state.items.values()).map(function (x) { return x.cat; }).filter(Boolean).concat('Other'))).sort();
+    var locs = LOCS.slice(); if (locs.indexOf(it.loc) < 0) locs.push(it.loc);
+    var units = UNITS.slice(); if (units.indexOf(it.unit) < 0) units.push(it.unit);
+    $('#sheetbox').innerHTML = '<div class="scrim" id="scrim"><form class="sheet" id="sheet" autocomplete="off"><h2>' + (id ? 'Edit item' : 'New item') + '</h2><div class="grid">' +
+      '<label class="f full">Name<input type="text" id="f-name" value="' + esc(it.name) + '" required></label>' +
+      '<label class="f">Place<select id="f-loc">' + locs.map(function (l) { return '<option' + (l === it.loc ? ' selected' : '') + '>' + esc(l) + '</option>'; }).join('') + '</select></label>' +
+      '<label class="f">Category<input type="text" id="f-cat" list="cats" value="' + esc(it.cat || '') + '"><datalist id="cats">' + cats.map(function (c) { return '<option value="' + esc(c) + '">'; }).join('') + '</datalist></label>' +
+      '<label class="f">Amount<input type="text" inputmode="decimal" id="f-qty" value="' + fmt(it.qty) + '"></label>' +
+      '<label class="f">Unit<select id="f-unit">' + units.map(function (u) { return '<option' + (u === it.unit ? ' selected' : '') + '>' + esc(u) + '</option>'; }).join('') + '</select></label>' +
+      '<label class="f">Tap removes<input type="text" inputmode="decimal" id="f-step" value="' + fmt(stepOf(it)) + '"></label>' +
+      dateField('Best before', 'f-best', it.best) + dateField('Bought', 'f-bought', it.bought) +
+      '<label class="chk"><input type="checkbox" id="f-shop"' + (it.shop ? ' checked' : '') + '> On the shopping list</label>' +
+      '</div><div class="btns"><button class="btn pri" type="submit">Save</button><button class="btn" type="button" id="f-cancel">Cancel</button>' +
+      (id ? '<button class="btn danger" type="button" id="f-del">Delete</button>' : '') + '</div></form></div>';
+    var close = function () { $('#sheetbox').innerHTML = ''; };
+    $('#scrim').onclick = function (e) { if (e.target.id === 'scrim') close(); };
+    $('#f-cancel').onclick = close;
+    $('#sheet').querySelectorAll('.cal input').forEach(function (p) {  // a date picked in the calendar goes into the text box
+      var t = document.getElementById(p.dataset.for);
+      p.onchange = function () { t.value = dmy(p.value); };
+      t.onchange = function () { var v = isoOf(t.value); if (v !== null) p.value = v; };
+    });
+    if (id) $('#f-del').onclick = function () {
+      var b = $('#f-del');
+      if (b.dataset.sure) { close(); state.items.delete(id); render(); state.db.doc('items/' + id).delete().catch(function () { toast('Could not delete.'); }); toast('Deleted ' + it.name); }
+      else { b.dataset.sure = '1'; b.textContent = 'Tap again to delete'; }
+    };
+    $('#sheet').onsubmit = async function (e) {
+      e.preventDefault();
+      var best = isoOf($('#f-best').value), bought = isoOf($('#f-bought').value);
+      if (best === null || bought === null) { toast('Write dates as day.month.year, for example 05.11.2026.'); $(best === null ? '#f-best' : '#f-bought').focus(); return; }
+      var data = {
+        name: $('#f-name').value.trim(), loc: $('#f-loc').value, cat: $('#f-cat').value.trim(),
+        qty: Math.max(0, round(num($('#f-qty').value))), unit: $('#f-unit').value, step: num($('#f-step').value) || 0,
+        best: best, bought: bought, updated: today(), shop: $('#f-shop').checked
+      };
+      if (!data.name) return;
+      var nid = id || newId();
+      state.items.set(nid, Object.assign({ id: nid }, data)); render(); close();
+      try { await state.db.doc('items/' + nid).set(data); } catch (err) { toast('Could not save.'); }
+    };
+    setTimeout(function () { $('#f-name').focus(); }, 30);
+  }
+
+  /* ---------- receipt tab ---------- */
+  function optionsHtml(sel) {
+    var items = Array.from(state.items.values()).sort(function (a, b) { return a.name.localeCompare(b.name, 'nb'); });
+    return '<option value="new"' + (sel === 'new' ? ' selected' : '') + '>＋ New item</option>' +
+      items.map(function (it) { return '<option value="' + esc(it.id) + '"' + (it.id === sel ? ' selected' : '') + '>' + esc(it.name) + ' · ' + esc(it.loc) + '</option>'; }).join('');
+  }
+  function renderReview() {
+    var r = state.rcpt, box = $('#rreview');
+    if (!r) { box.innerHTML = ''; return; }
+    var dup = r.number && state.receipts.indexOf(r.number) >= 0;
+    var n = r.lines.filter(function (l) { return l.include; }).length;
+    var html = '<div class="group"><h2 style="--c:var(--accent)">Check the lines<span>' + esc(dmy(r.date)) + '</span></h2></div>';
+    if (dup) html += '<div class="banner">Receipt ' + esc(r.number) + ' was already added. Adding it again would double the amounts.</div>';
+    r.lines.forEach(function (l, i) {
+      var tag = l.how === 'known' ? '' : l.how === 'similar' ? '<span class="tag">similar</span>' : '<span class="tag new">new</span>';
+      var unit = l.itemId !== 'new' && state.items.get(l.itemId) ? state.items.get(l.itemId).unit : l.newUnit;
+      html += '<div class="rline' + (l.include ? '' : ' skip') + '" data-i="' + i + '"><div class="rhead"><input type="checkbox" data-f="include" aria-label="Include line"' + (l.include ? ' checked' : '') + '>' +
+        '<div><div class="rname">' + esc(l.raw) + tag + '</div><div class="rsub">on receipt: ' + fmt(l.rqty) + ' ' + esc(l.runit) + '</div></div></div>' +
+        '<div class="rctl"><label class="f">Goes to<select data-f="item">' + optionsHtml(l.itemId) + '</select></label>' +
+        '<label class="f">Add (' + esc(unit) + ')<input type="text" inputmode="decimal" data-f="amount" value="' + fmt(l.amount) + '"></label></div>';
+      if (l.itemId === 'new') {
+        html += '<div class="rctl"><label class="f">Name<input type="text" data-f="newName" value="' + esc(l.newName) + '"></label>' +
+          '<label class="f">Place<select data-f="newLoc">' + LOCS.map(function (x) { return '<option' + (x === l.newLoc ? ' selected' : '') + '>' + x + '</option>'; }).join('') + '</select></label></div>';
+      }
+      html += '</div>';
+    });
+    html += '<div class="btns"><button class="btn pri" id="rapply"' + (n ? '' : ' disabled') + '>' + (dup ? 'Add anyway' : 'Add ' + n + ' line' + (n === 1 ? '' : 's') + ' to stock') + '</button><button class="btn" id="rcancel">Clear</button></div>';
+    box.innerHTML = html;
+    $('#rcancel').onclick = function () { state.rcpt = null; renderReview(); };
+    $('#rapply').onclick = applyReceipt;
+  }
+  async function applyReceipt() {
+    var r = state.rcpt; if (!r) return;
+    var btn = $('#rapply'); btn.disabled = true; btn.textContent = 'Saving…';
+    var date = r.date || today(), adds = new Map(), fresh = new Map(), aliasWrites = [], count = 0;
+    r.lines.forEach(function (l) {
+      if (!l.include) return;
+      count++;
+      var id = l.itemId;
+      if (id === 'new') {
+        var k = norm(l.newName) + '|' + l.newLoc;
+        if (!fresh.has(k)) fresh.set(k, { id: newId(), name: l.newName.trim() || cleanName(l.raw), loc: l.newLoc, cat: l.newCat || '', qty: 0, unit: l.newUnit, step: 0, best: '', bought: date, updated: today() });
+        var f = fresh.get(k); f.qty = round(f.qty + l.amount); id = f.id; l.itemId = id; l.created = true;
+      } else adds.set(id, round((adds.get(id) || 0) + l.amount));
+      aliasWrites.push({ id: aliasId(norm(l.raw)), data: { key: norm(l.raw), itemId: id, per: l.per || 1 } });
+    });
+    try {
+      for (var e of adds) {
+        var cur = state.items.get(e[0]); if (!cur) continue;
+        var q = round(cur.qty + e[1]);
+        cur.qty = q; cur.bought = date; cur.updated = today(); cur.shop = false;  // bought: it comes off the shopping list
+        await state.db.doc('items/' + e[0]).update({ qty: q, bought: date, updated: cur.updated, shop: false });
+      }
+      for (var f2 of fresh.values()) { var d = Object.assign({}, f2); delete d.id; state.items.set(f2.id, f2); await state.db.doc('items/' + f2.id).set(d); }
+      for (var a of aliasWrites) await state.db.doc('aliases/' + a.id).set(a.data);
+      if (r.number && state.receipts.indexOf(r.number) < 0) {
+        state.receipts.push(r.number);
+        await state.db.doc('meta/receipts').set({ numbers: state.receipts });
+      }
+      state.rcpt = null; $('#rtext').value = ''; renderReview();
+      state.tab = 'all'; store('ks-tab', 'all'); render();
+      toast('Added ' + count + ' line' + (count === 1 ? '' : 's') + ' to stock');
+    } catch (err) {
+      toast('Saving stopped part-way. Check the list before trying again.');
+      btn.disabled = false; btn.textContent = 'Try again';
+    }
+  }
+  function showParsed(parsed) {
+    if (!parsed.items.length) { state.rcpt = null; $('#rreview').innerHTML = '<p class="banner">No product lines found in that text.</p>'; return; }
+    state.rcpt = { date: parsed.date, number: parsed.number, lines: buildLines(parsed) };
+    renderReview();
+  }
+  $('#rread').onclick = function () { showParsed(parseReceipt($('#rtext').value)); };
+
+  $('#rreview').addEventListener('change', function (e) {
+    var el = e.target, row = el.closest('.rline'); if (!row || !state.rcpt) return;
+    var l = state.rcpt.lines[+row.dataset.i], f = el.dataset.f;
+    if (f === 'include') l.include = el.checked;
+    else if (f === 'item') {
+      l.itemId = el.value;
+      if (el.value === 'new') { var g = guessPlace(l.raw); l.newName = l.newName || cleanName(l.raw); l.newLoc = l.newLoc || g.loc; l.newCat = l.newCat || g.cat; l.newUnit = l.newUnit || guessUnit(l.raw, l.runit); l.per = perGuess(l.raw, l.newUnit); }
+      else { var a = state.aliases.get(norm(l.raw)); l.per = (a && a.itemId === el.value) ? (a.per || 1) : perGuess(l.raw, state.items.get(el.value).unit); }
+      l.amount = calcAmount(l);
+    }
+    else if (f === 'amount') l.amount = round(num(el.value));
+    else if (f === 'newName') l.newName = el.value;
+    else if (f === 'newLoc') l.newLoc = el.value;
+    renderReview();
+  });
+
+  /* optional screenshot reading through Claude */
+  var sample = null;
+  try { sample = window.claude && window.claude.use ? await window.claude.use('sample') : null; } catch (e) { sample = null; }
+  if (sample) {
+    try { var lim = await sample.limits(); if (lim && lim.images) $('#rimgwrap').hidden = false; } catch (e) { /* no images */ }
+  }
+  $('#rfile').onchange = async function (e) {
+    var file = e.target.files && e.target.files[0]; if (!file || !sample) return;
+    $('#rreview').innerHTML = '<p class="hint">Claude is reading the screenshot…</p>';
+    try {
+      var res = await sample.json(
+        'This is a screenshot of a Norwegian grocery receipt. Reply with only a JSON object: ' +
+        '{"date":"YYYY-MM-DD or null","number":"receipt number digits or null","items":[{"name":"product text exactly as printed","qty":number,"unit":"stk|g|kg|l|pk"}]}. ' +
+        'One entry per purchased product line. qty and unit come from the small line under the product name (for example "1 stk" or "546 g"). ' +
+        'Skip totals, bonus lines, discounts and deposit (pant) lines.',
+        { images: [file], modelTier: 'default' });
+      var items = (res.items || []).map(function (x) { return { name: String(x.name || '').trim(), qty: Number(x.qty) || 1, unit: String(x.unit || 'stk').toLowerCase() }; }).filter(function (x) { return x.name; });
+      showParsed({ items: items, date: res.date || null, number: res.number ? String(res.number) : null });
+    } catch (err) {
+      $('#rreview').innerHTML = '<p class="banner">Could not read the screenshot (' + esc(err && err.code || 'error') + '). Paste the text instead.</p>';
+    }
+    e.target.value = '';
+  };
+
+  /* ---------- to do list: only shown with sync on, kept in todo.json in the private repo ---------- */
+  var TD = { repo: 'svenni702/Svenni-data', branch: 'main', path: 'todo.json', key: 'kitchen-stock-todo' };
+  var CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+  var todo = { items: [] }, tdSha = null, tdBusy = false, tdAgain = false, tdT = null, tdErr = '', tdLoaded = false;
+  try { todo = JSON.parse(store(TD.key) || 'null') || todo; } catch (e) { /* ignore */ }
+  function todoToken() { try { var g = JSON.parse(localStorage.getItem('kitchen-stock-gh') || 'null'); return g && g.token; } catch (e) { return null; } }
+  function todoOn() { return !!todoToken(); }
+  function tdKeep() { store(TD.key, JSON.stringify(todo)); }
+  function tdOpen() { return todo.items.filter(function (x) { return !x.del && !x.done; }).sort(function (a, b) { return a.pos - b.pos || a.t - b.t; }); }
+  function tdDone() { return todo.items.filter(function (x) { return !x.del && x.done; }).sort(function (a, b) { return b.doneAt - a.doneAt; }); }
+  function tdGet(id) { return todo.items.filter(function (x) { return x.id === id; })[0]; }
+  /* Each item carries t (last change); merging two copies keeps the newer version of each item. Deleted items stay as markers for a month so the delete reaches every device. */
+  function tdMerge(a, b) {
+    var m = {}, old = Date.now() - 30 * 864e5;
+    a.items.concat(b.items || []).forEach(function (x) { if (!m[x.id] || x.t > m[x.id].t) m[x.id] = x; });
+    return { items: Object.keys(m).sort().map(function (k) { return m[k]; }).filter(function (x) { return !(x.del && x.t < old); }) };
+  }
+  function tdSame(a, b) { return JSON.stringify(tdMerge(a, { items: [] }).items) === JSON.stringify(tdMerge(b, { items: [] }).items); }
+  function tdChange(x, fields) { Object.assign(x, fields, { t: Date.now() }); tdKeep(); renderTodo(); clearTimeout(tdT); tdT = setTimeout(tdSync, 800); }
+  function tdEnc(str) { return btoa(unescape(encodeURIComponent(str))); }
+  function tdDec(b64) { return decodeURIComponent(escape(atob(String(b64).replace(/\s/g, '')))); }
+  function tdApi(url, method, body) {
+    return fetch('https://api.github.com/repos/' + TD.repo + url, { method: method || 'GET', cache: 'no-store', headers: { 'Authorization': 'Bearer ' + todoToken(), 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+  }
+  var NOACCESS = 'This token cannot reach ' + TD.repo + '. On GitHub, edit the token and add ' + TD.repo + ' under Repository access.';
+  async function tdSync() {
+    if (!todoOn()) return;
+    if (tdBusy) { tdAgain = true; return; }
+    tdBusy = true; tdStat();
+    try {
+      for (var i = 0; i < 4; i++) {
+        var r = await tdApi('/contents/' + TD.path + '?ref=' + TD.branch + '&t=' + Date.now()), rem = { items: [] };
+        if (r.status === 404) { var rr = await tdApi(''); if (!rr.ok) throw new Error(NOACCESS); tdSha = null; }
+        else if (r.status === 401 || r.status === 403) throw new Error(NOACCESS);
+        else if (!r.ok) throw new Error('GitHub error ' + r.status);
+        else { var j = await r.json(); tdSha = j.sha; rem = JSON.parse(tdDec(j.content)); }
+        var m = tdMerge(todo, rem);
+        if (!tdSame(m, todo)) { todo = m; tdKeep(); }
+        if (tdSha && tdSame(m, rem)) break;
+        var body = { message: 'Update to do list', content: tdEnc(JSON.stringify(m)), branch: TD.branch };
+        if (tdSha) body.sha = tdSha;
+        var p = await tdApi('/contents/' + TD.path, 'PUT', body);
+        if (p.status === 409 || p.status === 422) continue;  // changed on another device meanwhile: read again and retry
+        if (p.status === 401 || p.status === 403 || p.status === 404) throw new Error(NOACCESS);
+        if (!p.ok) throw new Error('GitHub error ' + p.status);
+        tdSha = (await p.json()).content.sha; break;
+      }
+      tdErr = ''; tdLoaded = true;
+    } catch (e) {
+      tdErr = (e && e.message === 'Failed to fetch') ? 'Offline. Changes are kept on this device and sync when you are back online.' : String((e && e.message) || e);
+    }
+    tdBusy = false;
+    if (state.tab === 'todo') renderTodo();
+    if (tdAgain) { tdAgain = false; tdSync(); }
+  }
+  function tdStat() {
+    var el = $('#tstat'); if (!el) return;
+    el.textContent = tdErr || (tdBusy && !tdLoaded ? 'Loading…' : '');
+    el.className = 'hint' + (tdErr ? ' err' : '');
+    el.hidden = !el.textContent;
+  }
+  function tdRow(x, i, n) {
+    return '<div class="trow' + (x.done ? ' done' : '') + '" data-id="' + esc(x.id) + '">' +
+      '<button class="tbox" data-t="tog" aria-pressed="' + !!x.done + '" aria-label="' + (x.done ? 'Mark as not done' : 'Mark as done') + '"><i>' + CHECK + '</i></button>' +
+      '<div class="ttext" data-t="edit">' + esc(x.text) + '</div>' +
+      (x.done ? '' : '<button class="b" data-t="up" aria-label="Move up"' + (i === 0 ? ' disabled' : '') + '>↑</button><button class="b" data-t="down" aria-label="Move down"' + (i === n - 1 ? ' disabled' : '') + '>↓</button>') +
+      '<button class="b ed" data-t="del" aria-label="Delete">✕</button></div>';
+  }
+  function renderTodo() {
+    tdStat();
+    var open = tdOpen(), done = tdDone();
+    $('#tlist').innerHTML =
+      '<section class="group"><h2 style="--c:var(--accent)">To do<span>' + open.length + '</span></h2>' +
+      (open.length ? open.map(function (x, i) { return tdRow(x, i, open.length); }).join('') : '<p class="tempty">Nothing to do.</p>') + '</section>' +
+      '<section class="group"><h2 style="--c:var(--mute)">Done<span>' + done.length + '</span></h2>' +
+      (done.length ? done.map(function (x, i) { return tdRow(x, i, done.length); }).join('') + '<div class="btns"><button class="btn" data-t="clear">Clear done</button></div>' : '<p class="tempty">Nothing done yet.</p>') + '</section>';
+  }
+  function tdBottom() { var o = tdOpen(); return o.length ? o[o.length - 1].pos + 1 : 0; }
+  $('#tform').onsubmit = function (e) {
+    e.preventDefault();
+    var v = $('#tnew').value.trim(); if (!v) return;
+    var x = { id: newId(), text: v, done: false, doneAt: 0, pos: tdBottom() };
+    todo.items.push(x); $('#tnew').value = ''; tdChange(x, {});
+  };
+  $('#tlist').addEventListener('click', function (e) {
+    var a = e.target.closest('[data-t]'); if (!a || a.disabled) return;
+    var act = a.dataset.t;
+    if (act === 'clear') {
+      var gone = tdDone(); if (!gone.length) return;
+      var now = Date.now(); gone.forEach(function (x) { x.del = true; x.t = now; }); tdChange(gone[0], { del: true });
+      toast('Cleared ' + gone.length + ' done', function () { gone.forEach(function (x) { tdChange(x, { del: false }); }); });
+      return;
+    }
+    var row = a.closest('.trow'), x = row && tdGet(row.dataset.id); if (!x) return;
+    if (act === 'tog') tdChange(x, x.done ? { done: false, doneAt: 0, pos: tdBottom() } : { done: true, doneAt: Date.now() });
+    else if (act === 'edit') { var v = prompt('Change the reminder', x.text); if (v && v.trim() && v.trim() !== x.text) tdChange(x, { text: v.trim() }); }
+    else if (act === 'del') { tdChange(x, { del: true }); toast('Deleted “' + x.text + '”', function () { tdChange(x, { del: false }); }); }
+    else if (act === 'up' || act === 'down') {
+      var o = tdOpen(), i = o.indexOf(x), j = act === 'up' ? i - 1 : i + 1;
+      if (j < 0 || j >= o.length) return;
+      o[i] = o[j]; o[j] = x;
+      var now = Date.now(); o.forEach(function (y, k) { if (y.pos !== k) { y.pos = k; y.t = now; } });
+      tdChange(x, {});
+    }
+  });
+  window.addEventListener('ks-sync', function () {
+    if (!todoOn()) { todo = { items: [] }; tdSha = null; tdLoaded = false; try { localStorage.removeItem(TD.key); } catch (e) { /* ignore */ } }
+    render(); tdSync();
+  });
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) tdSync(); });
+  setInterval(function () { if (!document.hidden) tdSync(); }, 30000);
+
+  /* ---------- events ---------- */
+  $('#tabs').addEventListener('click', function (e) {
+    var t = e.target.closest('[data-tab]'); if (!t) return;
+    state.tab = t.dataset.tab; store('ks-tab', state.tab); render(); window.scrollTo(0, 0);
+    if (state.tab === 'todo') tdSync();
+  });
+  $('#q').addEventListener('input', function (e) { state.q = e.target.value; render(); });
+  $('#fab').onclick = function () { openSheet(null); };
+  $('#list').addEventListener('click', function (e) {
+    var a = e.target.closest('[data-act]'); if (!a) return;
+    var row = e.target.closest('.row'); var it = row && state.items.get(row.dataset.id); if (!it) return;
+    var act = a.dataset.act;
+    if (act === 'dec') setQty(it.id, it.qty - stepOf(it));
+    else if (act === 'inc') {
+      if (state.tab === 'shop') patch(it.id, { shop: false, bought: today() });  // Bought: off the list, stock goes up
+      setQty(it.id, it.qty + stepOf(it));
+    }
+    else if (act === 'out') setQty(it.id, 0, it.shop ? null : { label: 'Add to list', fn: function () { setShop(it.id, true); } });
+    else if (act === 'list') setShop(it.id, !it.shop);
+    else if (act === 'edit') openSheet(it.id);
+  });
+
+  /* ---------- storage ---------- */
+  var savedTab = store('ks-tab'); if (savedTab && TABS.some(function (t) { return t[0] === savedTab; })) state.tab = savedTab;
+  tdSync();
+  render();
+  try { state.db = window.claude && window.claude.use ? await window.claude.use('db') : null; } catch (e) { state.db = null; }
+  if (!state.db) { state.loaded = true; render(); return; }
+  state.db.collection('items').onSnapshot(function (snap) {
+    var next = new Map();
+    snap.docs.forEach(function (d) {
+      var data = d.data() || {}, id = d.id, old = state.items.get(id);
+      var it = Object.assign({ id: id, name: '', loc: 'Fridge', cat: '', qty: 0, unit: 'stk', step: 0, best: '', bought: '', updated: '', shop: false }, data);
+      if (old && (running.has(id) || pending.has(id))) { it.qty = old.qty; it.shop = old.shop; it.bought = old.bought; it.updated = old.updated; }
+      next.set(id, it);
+    });
+    state.items = next; state.loaded = true; render();
+    if (state.rcpt) { /* keep the review the user is editing */ }
+  }, function () { state.loaded = true; render(); });
+  state.db.collection('aliases').onSnapshot(function (snap) {
+    var m = new Map(); snap.docs.forEach(function (d) { var x = d.data(); if (x && x.key) m.set(x.key, x); }); state.aliases = m;
+  });
+  state.db.doc('meta/receipts').onSnapshot(function (d) { var x = d.exists ? d.data() : null; state.receipts = (x && x.numbers) || []; });
+})();
+</script>
+<script>
+(function () {
+  var box = document.getElementById('sheetbox');
+  function close() { box.innerHTML = ''; }
+  function stamp() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  document.getElementById('backup').onclick = function () {
+    var fn = window.__ks.fileName();
+    box.innerHTML = '<div class="scrim" id="scrim"><div class="sheet"><h2>Backup</h2>' +
+      '<p class="hint" style="margin-top:0">Your stock is kept inside this browser. The Save button also writes it into this page’s own file. ' +
+      'A backup file is a separate copy you can keep somewhere safe.' +
+      (window.__ksNoSave ? ' <b>This browser is blocking storage, so changes will not be kept.</b>' : '') + '</p>' +
+      '<div class="btns"><button class="btn pri" id="bk-export">Save backup file</button>' +
+      '<label class="btn filebtn">Restore from file<input type="file" id="bk-import" accept=".json,application/json"></label>' +
+      '<button class="btn" id="bk-close">Close</button></div><p class="hint" id="bk-msg"></p></div></div>';
+    if (fn) box.querySelector('.hint b').textContent = fn;
+    document.getElementById('scrim').onclick = function (e) { if (e.target.id === 'scrim') close(); };
+    document.getElementById('bk-close').onclick = close;
+    document.getElementById('bk-export').onclick = function () {
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([window.__ks.dump()], { type: 'application/json' }));
+      a.download = 'kitchen-stock-backup-' + stamp() + '.json';
+      document.body.appendChild(a); a.click(); a.remove();
+      document.getElementById('bk-msg').textContent = 'Saved ' + a.download + ' to your downloads.';
+    };
+    document.getElementById('bk-import').onchange = function (e) {
+      var f = e.target.files && e.target.files[0]; if (!f) return;
+      var r = new FileReader();
+      r.onload = function () {
+        var msg = document.getElementById('bk-msg');
+        try {
+          var obj = JSON.parse(r.result);
+          if (!obj || obj.app !== 'kitchen-stock' || typeof obj.data !== 'object') throw 0;
+          var n = Object.keys(obj.data).filter(function (k) { return k.indexOf('items/') === 0; }).length;
+          msg.innerHTML = 'This file has ' + n + ' items and will replace everything now in the app. <button class="btn pri" id="bk-yes" style="margin-top:8px">Replace</button>';
+          document.getElementById('bk-yes').onclick = function () { window.__ks.load(obj.data); close(); };
+        } catch (err) { msg.textContent = 'That file is not a Kitchen Stock backup.'; }
+      };
+      r.readAsText(f);
+    };
+  };
+})();
+</script>
+</body>
+</html>
