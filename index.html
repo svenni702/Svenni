@@ -105,6 +105,9 @@ textarea { resize: vertical; }
 .scrim { position: fixed; inset: 0; z-index: 50; background: rgba(0, 0, 0, .45); display: flex; align-items: flex-end; justify-content: center; }
 .sheet { width: 100%; max-width: 560px; max-height: 92%; overflow-y: auto; background: var(--surface); border-radius: 18px 18px 0 0; padding: 18px 16px calc(18px + env(safe-area-inset-bottom, 0px)); }
 .sheet h2 { margin: 0 0 12px; font-size: 18px; }
+.sheet h3 { margin: 4px 0 4px; font-size: 15px; }
+.steps { margin: 10px 0 0; padding-left: 20px; }
+.steps li { margin-bottom: 4px; }
 .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .grid .full { grid-column: 1 / -1; }
 label.f { display: block; font-size: 12.5px; color: var(--mute); }
@@ -148,7 +151,7 @@ body { margin: 0; }
 <body>
 <div class="wrap">
   <header>
-    <div class="top"><h1>Kitchen Stock</h1><small id="count"></small><button class="b linkb" id="savehtml" hidden>Save</button><button class="b linkb" id="syncbtn">Sync</button><button class="b linkb" id="backup">Backup</button></div>
+    <div class="top"><h1>Kitchen Stock</h1><small id="count"></small><button class="b linkb" id="savehtml" hidden>Save</button><button class="b linkb" id="syncbtn">Sync</button><button class="b linkb" id="backup">Backup</button><button class="b linkb" id="morebtn" aria-label="More" hidden>⋮</button></div>
     <div class="search"><input type="search" id="q" placeholder="Search items" aria-label="Search items"></div>
     <div class="tabs" id="tabs" role="tablist"></div>
   </header>
@@ -235,7 +238,7 @@ body { margin: 0; }
   function pageHtml(T) {
     var c = document.documentElement.cloneNode(true);
     ['tabs', 'list', 'rreview', 'filebar', 'sheetbox', 'toastbox', 'count', 'tlist', 'tstat'].forEach(function (id) { var e = c.querySelector('#' + id); if (e) e.textContent = ''; });
-    ['rcpt', 'todo', 'rimgwrap', 'savehtml'].forEach(function (id) { var e = c.querySelector('#' + id); if (e) e.setAttribute('hidden', ''); });
+    ['rcpt', 'todo', 'rimgwrap', 'savehtml', 'morebtn'].forEach(function (id) { var e = c.querySelector('#' + id); if (e) e.setAttribute('hidden', ''); });
     var sy = c.querySelector('#syncbtn'); if (sy) sy.textContent = 'Sync';
     ['fab'].forEach(function (id) { var e = c.querySelector('#' + id); if (e) e.removeAttribute('hidden'); });
     var s = c.querySelector('.search'); if (s) s.removeAttribute('hidden');
@@ -642,6 +645,7 @@ body { margin: 0; }
       return '<button class="tab" role="tab" data-tab="' + t[0] + '" aria-selected="' + (state.tab === t[0]) + '">' + t[1] + n + '</button>';
     }).join('');
     $('#tabs').innerHTML = tabsHtml;
+    $('#morebtn').hidden = !todoOn();
     var isR = state.tab === 'rcpt', isT = state.tab === 'todo', other = isR || isT;
     $('#rcpt').hidden = !isR; $('#todo').hidden = !isT; $('#list').hidden = other; $('.search').hidden = other; $('#fab').hidden = other;
     var total = 0, stocked = 0; state.items.forEach(function (it) { total++; if (it.qty > 0) stocked++; });
@@ -945,6 +949,54 @@ body { margin: 0; }
   document.addEventListener('visibilitychange', function () { if (!document.hidden) tdSync(); });
   setInterval(function () { if (!document.hidden) tdSync(); }, 30000);
 
+  /* ---------- ⋮ menu: the Android widget (its APK is on the widget-apk branch of the private repo) ---------- */
+  var WIDGET_URL = 'https://api.github.com/repos/' + TD.repo + '/contents/';
+  function widgetGet(path) { return fetch(WIDGET_URL + path + '?ref=widget-apk&t=' + Date.now(), { cache: 'no-store', headers: { 'Authorization': 'Bearer ' + todoToken(), 'Accept': 'application/vnd.github.raw+json' } }); }
+  function openMore() {
+    $('#sheetbox').innerHTML = '<div class="scrim" id="scrim"><div class="sheet"><h2>More</h2>' +
+      '<h3>Android widget</h3><p class="hint">Shows the shopping list, to do list and what is in stock on your home screen. Tap a line in it to open this page on the same tab.</p>' +
+      '<div class="btns"><button class="btn pri" id="m-apk">Download widget</button><button class="btn" id="m-tok">Copy token</button></div>' +
+      '<p class="hint" id="m-stat" hidden></p>' +
+      '<ol class="hint steps"><li>Tap <b>Download widget</b>, open the file and allow the install when Android asks.</li>' +
+      '<li>Tap <b>Copy token</b>, open the <b>Kitchen Stock widget</b> app, tap <b>Paste</b> and then <b>Save</b>.</li>' +
+      '<li>Long-press an empty spot on the home screen, tap <b>Widgets</b> and add <b>Kitchen Stock</b>.</li></ol>' +
+      '<div class="btns"><button class="btn" id="m-close">Close</button></div></div></div>';
+    var close = function () { $('#sheetbox').innerHTML = ''; };
+    var stat = function (t, bad) { var el = $('#m-stat'); if (!el) return; el.hidden = !t; el.textContent = t; el.style.color = bad ? 'var(--out)' : ''; };
+    $('#scrim').onclick = function (e) { if (e.target.id === 'scrim') close(); };
+    $('#m-close').onclick = close;
+    $('#m-tok').onclick = function () {
+      var t = todoToken(); if (!t) return;
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(function () { stat('Token copied. Paste it in the widget app.'); }, function () { stat('Could not copy here. Copy the token from where you saved it.', true); });
+      else stat('Copying is not supported in this browser.', true);
+    };
+    $('#m-apk').onclick = async function () {
+      stat('Downloading…');
+      try {
+        var r = await widgetGet('kitchen-stock-widget.apk');
+        if (r.status === 404) { stat('The widget is not built yet. Try again later.', true); return; }
+        if (!r.ok) { stat('GitHub error ' + r.status + '.', true); return; }
+        var blob = new Blob([await r.arrayBuffer()], { type: 'application/vnd.android.package-archive' });
+        var v = ''; try { var vr = await widgetGet('version.txt'); if (vr.ok) v = (await vr.text()).trim(); } catch (e) { /* no version */ }
+        var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'kitchen-stock-widget.apk';
+        document.body.appendChild(a); a.click();
+        setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 60000);
+        stat('Downloaded' + (v ? ' version ' + v : '') + '. Open kitchen-stock-widget.apk from the download notice or your Downloads folder.');
+      } catch (e) { stat('Could not download. Check your connection.', true); }
+    };
+  }
+  $('#morebtn').onclick = openMore;
+
+  /* a link to #todo, #shop or #have (the widget uses these) opens that tab */
+  function hashTab() {
+    var h = location.hash.slice(1);
+    if (!h || !TABS.some(function (t) { return t[0] === h; })) return false;
+    state.tab = h; store('ks-tab', h);
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* ignore */ }
+    return true;
+  }
+  window.addEventListener('hashchange', function () { if (hashTab()) { render(); window.scrollTo(0, 0); if (state.tab === 'todo') tdSync(); } });
+
   /* ---------- events ---------- */
   $('#tabs').addEventListener('click', function (e) {
     var t = e.target.closest('[data-tab]'); if (!t) return;
@@ -969,6 +1021,7 @@ body { margin: 0; }
 
   /* ---------- storage ---------- */
   var savedTab = store('ks-tab'); if (savedTab && TABS.some(function (t) { return t[0] === savedTab; })) state.tab = savedTab;
+  hashTab();
   tdSync();
   render();
   try { state.db = window.claude && window.claude.use ? await window.claude.use('db') : null; } catch (e) { state.db = null; }
