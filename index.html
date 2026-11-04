@@ -616,7 +616,7 @@ body { margin: 0; }
   function visible() {
     var q = norm(state.q), out = [];
     state.items.forEach(function (it) {
-      if (q && norm(it.name + ' ' + (it.cat || '') + ' ' + it.loc).indexOf(q) < 0) return;
+      if (q && norm(it.name + ' ' + (it.cat || '') + ' ' + it.loc + ' ' + (it.tags || '')).indexOf(q) < 0) return;
       if (state.tab === 'shop') { if (!it.shop) return; }
       else if (state.tab === 'have') { if (it.qty <= 0) return; }
       else if (state.tab === 'cup') { if (locGroup(it.loc) !== 'cup') return; }
@@ -684,6 +684,7 @@ body { margin: 0; }
     var units = UNITS.slice(); if (units.indexOf(it.unit) < 0) units.push(it.unit);
     $('#sheetbox').innerHTML = '<div class="scrim" id="scrim"><form class="sheet" id="sheet" autocomplete="off"><h2>' + (id ? 'Edit item' : 'New item') + '</h2><div class="grid">' +
       '<label class="f full">Name<input type="text" id="f-name" value="' + esc(it.name) + '" required></label>' +
+      '<label class="f full">Search words<input type="text" id="f-tags" value="' + esc(it.tags || '') + '" placeholder="Only used by search, for example: melk, milk, frokost"></label>' +
       '<label class="f">Place<select id="f-loc">' + locs.map(function (l) { return '<option' + (l === it.loc ? ' selected' : '') + '>' + esc(l) + '</option>'; }).join('') + '</select></label>' +
       '<label class="f">Category<input type="text" id="f-cat" list="cats" value="' + esc(it.cat || '') + '"><datalist id="cats">' + cats.map(function (c) { return '<option value="' + esc(c) + '">'; }).join('') + '</datalist></label>' +
       '<label class="f">Amount<input type="text" inputmode="decimal" id="f-qty" value="' + fmt(it.qty) + '"></label>' +
@@ -711,7 +712,7 @@ body { margin: 0; }
       var best = isoOf($('#f-best').value), bought = isoOf($('#f-bought').value);
       if (best === null || bought === null) { toast('Write dates as day.month.year, for example 05.11.2026.'); $(best === null ? '#f-best' : '#f-bought').focus(); return; }
       var data = {
-        name: $('#f-name').value.trim(), loc: $('#f-loc').value, cat: $('#f-cat').value.trim(),
+        name: $('#f-name').value.trim(), tags: $('#f-tags').value.trim(), loc: $('#f-loc').value, cat: $('#f-cat').value.trim(),
         qty: Math.max(0, round(num($('#f-qty').value))), unit: $('#f-unit').value, step: num($('#f-step').value) || 0,
         best: best, bought: bought, updated: today(), shop: $('#f-shop').checked
       };
@@ -1030,7 +1031,7 @@ body { margin: 0; }
     var next = new Map();
     snap.docs.forEach(function (d) {
       var data = d.data() || {}, id = d.id, old = state.items.get(id);
-      var it = Object.assign({ id: id, name: '', loc: 'Fridge', cat: '', qty: 0, unit: 'stk', step: 0, best: '', bought: '', updated: '', shop: false }, data);
+      var it = Object.assign({ id: id, name: '', loc: 'Fridge', cat: '', qty: 0, unit: 'stk', step: 0, best: '', bought: '', updated: '', shop: false, tags: '' }, data);
       if (old && (running.has(id) || pending.has(id))) { it.qty = old.qty; it.shop = old.shop; it.bought = old.bought; it.updated = old.updated; }
       next.set(id, it);
     });
