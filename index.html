@@ -88,6 +88,11 @@ textarea { resize: vertical; }
 .trow.done .ttext { color: var(--mute); text-decoration: line-through; }
 .trow .b[disabled] { opacity: .3; cursor: default; }
 .tempty { color: var(--mute); margin: 10px 0 18px; }
+.tgrip { flex: none; width: 30px; height: 44px; margin-left: -4px; display: grid; place-items: center; color: var(--mute); cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
+.tgrip svg { width: 18px; height: 18px; fill: currentColor; }
+.trow.drag { position: relative; z-index: 20; background: var(--surface); border-radius: 10px; box-shadow: 0 6px 20px rgba(0, 0, 0, .25); }
+.trow.drag .tgrip { cursor: grabbing; color: var(--accent); }
+@media (max-width: 560px) { .trow .b[data-t=up], .trow .b[data-t=down] { position: absolute; width: 1px; min-width: 0; height: 1px; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); } }
 #tstat.err { color: var(--out); }
 .row.out .qty { background: var(--out-bg); border-color: transparent; }
 .row.out .qty b { color: var(--out); }
@@ -845,6 +850,8 @@ body { margin: 0; }
   try { todo = JSON.parse(store(TD.key) || 'null') || todo; } catch (e) { /* ignore */ }
   function todoToken() { try { var g = JSON.parse(localStorage.getItem('kitchen-stock-gh') || 'null'); return g && g.token; } catch (e) { return null; } }
   function todoOn() { return !!todoToken(); }
+  var GRIP = '<svg viewBox="0 0 18 18" aria-hidden="true"><circle cx="6" cy="3.5" r="1.7"/><circle cx="12" cy="3.5" r="1.7"/><circle cx="6" cy="9" r="1.7"/><circle cx="12" cy="9" r="1.7"/><circle cx="6" cy="14.5" r="1.7"/><circle cx="12" cy="14.5" r="1.7"/></svg>';
+  var tdDrag = null;
   function tdKeep() { store(TD.key, JSON.stringify(todo)); }
   function tdOpen() { return todo.items.filter(function (x) { return !x.del && !x.done; }).sort(function (a, b) { return a.pos - b.pos || a.t - b.t; }); }
   function tdDone() { return todo.items.filter(function (x) { return !x.del && x.done; }).sort(function (a, b) { return b.doneAt - a.doneAt; }); }
@@ -901,6 +908,7 @@ body { margin: 0; }
   }
   function tdRow(x, i, n) {
     return '<div class="trow' + (x.done ? ' done' : '') + '" data-id="' + esc(x.id) + '">' +
+      (x.done ? '' : '<span class="tgrip" title="Drag to move" aria-hidden="true">' + GRIP + '</span>') +
       '<button class="tbox" data-t="tog" aria-pressed="' + !!x.done + '" aria-label="' + (x.done ? 'Mark as not done' : 'Mark as done') + '"><i>' + CHECK + '</i></button>' +
       '<div class="ttext" data-t="edit">' + esc(x.text) + '</div>' +
       (x.done ? '' : '<button class="b" data-t="up" aria-label="Move up"' + (i === 0 ? ' disabled' : '') + '>↑</button><button class="b" data-t="down" aria-label="Move down"' + (i === n - 1 ? ' disabled' : '') + '>↓</button>') +
@@ -908,6 +916,7 @@ body { margin: 0; }
   }
   function renderTodo() {
     tdStat();
+    if (tdDrag) return;  // a sync finishing mid-drag; the drop renders again
     var open = tdOpen(), done = tdDone();
     $('#tlist').innerHTML =
       '<section class="group"><h2 style="--c:var(--accent)">To do<span>' + open.length + '</span></h2>' +
@@ -916,10 +925,12 @@ body { margin: 0; }
       (done.length ? done.map(function (x, i) { return tdRow(x, i, done.length); }).join('') + '<div class="btns"><button class="btn" data-t="clear">Clear done</button></div>' : '<p class="tempty">Nothing done yet.</p>') + '</section>';
   }
   function tdBottom() { var o = tdOpen(); return o.length ? o[o.length - 1].pos + 1 : 0; }
+  function tdTop() { var o = tdOpen(); return o.length ? o[0].pos - 1 : 0; }
+  function tdSetOrder(o) { var now = Date.now(); o.forEach(function (y, k) { if (y.pos !== k) { y.pos = k; y.t = now; } }); tdChange(o[0], {}); }
   $('#tform').onsubmit = function (e) {
     e.preventDefault();
     var v = $('#tnew').value.trim(); if (!v) return;
-    var x = { id: newId(), text: v, done: false, doneAt: 0, pos: tdBottom() };
+    var x = { id: newId(), text: v, done: false, doneAt: 0, pos: tdTop() };
     todo.items.push(x); $('#tnew').value = ''; tdChange(x, {});
   };
   $('#tlist').addEventListener('click', function (e) {
@@ -939,9 +950,49 @@ body { margin: 0; }
       var o = tdOpen(), i = o.indexOf(x), j = act === 'up' ? i - 1 : i + 1;
       if (j < 0 || j >= o.length) return;
       o[i] = o[j]; o[j] = x;
-      var now = Date.now(); o.forEach(function (y, k) { if (y.pos !== k) { y.pos = k; y.t = now; } });
-      tdChange(x, {});
+      tdSetOrder(o);
     }
+  });
+  /* Drag a reminder by its handle. The other rows hop around the held one: moving the held row itself would drop the pointer on touch screens. */
+  function tdPlace() {
+    var d = tdDrag; if (!d) return;
+    d.row.style.transform = '';
+    var mid = d.y - d.grab + d.row.offsetHeight / 2, rows = [].slice.call(d.row.parentNode.querySelectorAll('.trow')), at = rows.indexOf(d.row), to = 0;
+    rows.forEach(function (r) { if (r === d.row) return; var b = r.getBoundingClientRect(); if (b.top + b.height / 2 < mid) to++; });
+    for (; at < to; at++) d.row.parentNode.insertBefore(d.row.nextElementSibling, d.row);
+    for (; at > to; at--) d.row.parentNode.insertBefore(d.row.previousElementSibling, d.row.nextElementSibling);
+    d.row.style.transform = 'translateY(' + (d.y - d.grab - d.row.getBoundingClientRect().top) + 'px)';
+  }
+  function tdDragFrame() {
+    var d = tdDrag; if (!d) return;
+    var edge = 90, h = window.innerHeight;
+    if (d.y < edge) window.scrollBy(0, -Math.ceil((edge - d.y) / 5));
+    else if (d.y > h - edge) window.scrollBy(0, Math.ceil((d.y - h + edge) / 5));
+    tdPlace();
+    requestAnimationFrame(tdDragFrame);
+  }
+  function tdDragMove(e) { if (tdDrag && e.pointerId === tdDrag.id) { tdDrag.y = e.clientY; e.preventDefault(); } }
+  function tdDragEnd(e) {
+    var d = tdDrag; if (!d || e.pointerId !== d.id) return;
+    d.y = e.clientY; tdPlace();  // a quick flick can end before the next frame
+    tdDrag = null;
+    window.removeEventListener('pointermove', tdDragMove); window.removeEventListener('pointerup', tdDragEnd); window.removeEventListener('pointercancel', tdDragEnd);
+    var ids = [].map.call(d.row.parentNode.querySelectorAll('.trow'), function (r) { return r.dataset.id; });
+    var was = tdOpen(), held = ids.map(tdGet).filter(function (x) { return x && !x.del && !x.done; });
+    if (e.type === 'pointercancel' || !held.length) { renderTodo(); return; }
+    var o = was.filter(function (x) { return ids.indexOf(x.id) < 0; }).concat(held);  // anything another device added meanwhile stays on top
+    if (o.every(function (x, k) { return x === was[k]; })) { renderTodo(); return; }
+    tdSetOrder(o);
+  }
+  $('#tlist').addEventListener('pointerdown', function (e) {
+    var g = e.target.closest('.tgrip'); if (!g || tdDrag || e.button !== 0) return;
+    e.preventDefault();
+    var row = g.closest('.trow');
+    tdDrag = { row: row, id: e.pointerId, y: e.clientY, grab: e.clientY - row.getBoundingClientRect().top };
+    try { g.setPointerCapture(e.pointerId); } catch (err) { /* still works through window */ }
+    row.classList.add('drag');
+    window.addEventListener('pointermove', tdDragMove, { passive: false }); window.addEventListener('pointerup', tdDragEnd); window.addEventListener('pointercancel', tdDragEnd);
+    requestAnimationFrame(tdDragFrame);
   });
   window.addEventListener('ks-sync', function () {
     if (!todoOn()) { todo = { items: [] }; tdSha = null; tdLoaded = false; try { localStorage.removeItem(TD.key); } catch (e) { /* ignore */ } }
